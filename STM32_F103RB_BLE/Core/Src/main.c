@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BUFFER_SIZE 100 // Define the size of the buffer
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -44,7 +44,11 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static uint32_t gBLECnt 	= 0;       // Counter for BLE messages
+static uint32_t gGPIOState 	= 0;       // State of the GPIO pin
+uint8_t rxIndex 			= 0;       // Current index for the buffer
+char rxBuffer[BUFFER_SIZE]; 		   // Buffer for received data
+extern UART_HandleTypeDef huart1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,17 +92,33 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  HAL_UART_Receive_IT(&huart1, (uint8_t *)&rxBuffer[rxIndex], 1);
+  HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
+      /* USER CODE END WHILE */
+
+      /* USER CODE BEGIN 3 */
+
+      switch (gGPIOState)
+      {
+          case 1:
+              HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
+              break;
+          case 2:
+              HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
+              break;
+          default:
+              break;
+      }
+      HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -140,7 +160,37 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART1) { // Check if it's the correct UART instance
+        gBLECnt++;  // Increment the BLE counter
 
+        // Process the received character
+        switch (rxBuffer[rxIndex-1]) {
+            case '1':
+                gGPIOState = 1;  // Set GPIO state to high
+                HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
+                // Optionally, add code to toggle the GPIO pin here
+                break;
+            case '2':
+                gGPIOState = 2;  // Set GPIO state to low
+                HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_SET);
+                // Optionally, add code to toggle the GPIO pin here
+                break;
+            default:
+                // Handle unexpected messages if necessary
+                break;
+        }
+
+        // Prepare to receive the next byte
+        HAL_UART_Receive_IT(&huart1, (uint8_t *)&rxBuffer[rxIndex], 1);
+
+        // Move to the next index, wrap around if necessary
+        ++rxIndex;
+        if (rxIndex >= BUFFER_SIZE) {
+            rxIndex = 0; // Wrap around
+        }
+    }
+}
 /* USER CODE END 4 */
 
 /**
