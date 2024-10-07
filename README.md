@@ -3,18 +3,20 @@
 # Tools
 
 # HW Infomation
-1. Nucleo-F103RB
+● Nucleo-F103RB
    
-3. HC-06
+● HC-06
 
 # Tools
-1. Logic Analyzer
+● Logic Analyzer
    
-3. STM32cubeMX
+● STM32cubeMX
    
-5. IDE: stm32cubeide
+● IDE: stm32cubeide
+
+● Arduino Bluetooth Controoler
    
-7. C
+● C
 
 # Usecase Diagram
 Here is a UML diagram explaining the structure:
