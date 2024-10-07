@@ -1,7 +1,5 @@
 # STM32BLEDemo
 
-# Tools
-
 # HW Infomation
 ● Nucleo-F103RB
    
