@@ -20,10 +20,11 @@
 #include "main.h"
 #include "usart.h"
 #include "gpio.h"
-
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,6 +35,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BUFFER_SIZE 100 // Define the size of the buffer
+#define BLEBUF_SIZE 40 // Define the size of the buffer
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -48,17 +50,70 @@ static uint32_t gBLECnt 	= 0;       // Counter for BLE messages
 static uint32_t gGPIOState 	= 0;       // State of the GPIO pin
 uint8_t rxIndex 			= 0;       // Current index for the buffer
 char rxBuffer[BUFFER_SIZE]; 		   // Buffer for received data
+char messageBuffer[BLEBUF_SIZE];
+uint32_t messageIndex = 0;
+uint8_t bBLEFlag =0;
 extern UART_HandleTypeDef huart1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+typedef struct UserInfo
+{
+    float fCurrent;
+    uint32_t iDuty;
+    uint32_t iFrequency;
+} UserInfo;
 
+UserInfo userinfo = {0.0,0,0};
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+UserInfo parseMessage(char *messageBuffer) {
+    // Find the first occurrence of 'S' and 'E'
+    char *start = strchr(messageBuffer, 'S');
+    char *end = strchr(messageBuffer, 'E');
+
+    // Check if both 'S' and 'E' exist and their positions are valid
+    if (start != NULL && end != NULL && start < end) {
+        bBLEFlag = 1;
+    } else {
+        bBLEFlag = 0;
+        return; // Exit the function if 'S' and 'E' are not valid
+    }
+
+    if (bBLEFlag == 1) {
+        // Parse Current value between 'c' and 'c'
+        char *startCurrent = strchr(start, 'c');
+        char *endCurrent = strchr(startCurrent + 1, 'c');
+        if (startCurrent != NULL && endCurrent != NULL && endCurrent < end) {
+            char currentStr[10] = {0};
+            strncpy(currentStr, startCurrent + 1, endCurrent - startCurrent - 1);
+            userinfo.fCurrent = atof(currentStr);
+        }
+
+        // Parse Duty Cycle value between 'd' and 'd'
+        char *startDuty = strchr(start, 'd');
+        char *endDuty = strchr(startDuty + 1, 'd');
+        if (startDuty != NULL && endDuty != NULL && endDuty < end) {
+            char dutyStr[10] = {0};
+            strncpy(dutyStr, startDuty + 1, endDuty - startDuty - 1);
+            userinfo.iDuty = (uint32_t)atoi(dutyStr);
+        }
+
+        // Parse Frequency value between 'f' and 'f'
+        char *startFreq = strchr(start, 'f');
+        char *endFreq = strchr(startFreq + 1, 'f');
+        if (startFreq != NULL && endFreq != NULL && endFreq < end) {
+            char freqStr[10] = {0};
+            strncpy(freqStr, startFreq + 1, endFreq - startFreq - 1);
+            userinfo.iFrequency = (uint32_t)atoi(freqStr);
+        }
+    }
+    return userinfo;
+}
 
 /* USER CODE END 0 */
 
@@ -106,6 +161,7 @@ int main(void)
       /* USER CODE END WHILE */
 
       /* USER CODE BEGIN 3 */
+	  UserInfo tempInfo = parseMessage(messageBuffer);
 
       switch (gGPIOState)
       {
@@ -160,12 +216,15 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    if (huart->Instance == USART1) { // Check if it's the correct UART instance
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == USART1)
+	{ 	// Check if it's the correct UART instance
         gBLECnt++;  // Increment the BLE counter
 
         // Process the received character
-        switch (rxBuffer[rxIndex-1]) {
+        switch (rxBuffer[rxIndex-1])
+		{
             case '1':
                 gGPIOState = 1;  // Set GPIO state to high
                 HAL_GPIO_WritePin(USER_LED_GPIO_Port, USER_LED_Pin, GPIO_PIN_RESET);
@@ -183,12 +242,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
         // Prepare to receive the next byte
         HAL_UART_Receive_IT(&huart1, (uint8_t *)&rxBuffer[rxIndex], 1);
-
         // Move to the next index, wrap around if necessary
+        messageIndex = (rxBuffer[rxIndex-1] == 'S') ? 0 : messageIndex;
+        messageBuffer[messageIndex] = rxBuffer[rxIndex-1];
+
+        ++messageIndex;
         ++rxIndex;
-        if (rxIndex >= BUFFER_SIZE) {
-            rxIndex = 0; // Wrap around
-        }
+		// 2024-10-27, hjkim: Reset indexes after reaching buffer size limit
+		messageIndex= (messageIndex >= BLEBUF_SIZE) ? 0 : messageIndex;
+		rxIndex		= (rxIndex >= BLEBUF_SIZE) 		? 0 : rxIndex;
     }
 }
 /* USER CODE END 4 */
