@@ -66,53 +66,62 @@ typedef struct UserInfo
     uint32_t iFrequency;
 } UserInfo;
 
-UserInfo userinfo = {0.0,0,0};
+UserInfo gUserInfo = {0.0,0,0};
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-UserInfo parseMessage(char *messageBuffer) {
+UserInfo parseMessage(char *messageBuffer)
+{
     // Find the first occurrence of 'S' and 'E'
     char *start = strchr(messageBuffer, 'S');
     char *end = strchr(messageBuffer, 'E');
 
+    // 2024-10-28, hjkim: Initialize with existing values
+    UserInfo tempInfo = gUserInfo;
+
     // Check if both 'S' and 'E' exist and their positions are valid
-    if (start != NULL && end != NULL && start < end) {
-        bBLEFlag = 1;
-    } else {
-        bBLEFlag = 0;
-        return; // Exit the function if 'S' and 'E' are not valid
+    bBLEFlag = (start != NULL && end != NULL && start < end) ? 1 : 0;
+
+    if(bBLEFlag == 0)
+    {
+        // 2024-10-28, hjkim: BLE message parsing error, discarding this data
+    	return tempInfo;
     }
 
-    if (bBLEFlag == 1) {
+    if (bBLEFlag == 1)
+    {
         // Parse Current value between 'c' and 'c'
         char *startCurrent = strchr(start, 'c');
         char *endCurrent = strchr(startCurrent + 1, 'c');
-        if (startCurrent != NULL && endCurrent != NULL && endCurrent < end) {
+        if (startCurrent != NULL && endCurrent != NULL && endCurrent < end)
+        {
             char currentStr[10] = {0};
             strncpy(currentStr, startCurrent + 1, endCurrent - startCurrent - 1);
-            userinfo.fCurrent = atof(currentStr);
+            tempInfo.fCurrent = atof(currentStr);
         }
 
         // Parse Duty Cycle value between 'd' and 'd'
         char *startDuty = strchr(start, 'd');
         char *endDuty = strchr(startDuty + 1, 'd');
-        if (startDuty != NULL && endDuty != NULL && endDuty < end) {
+        if (startDuty != NULL && endDuty != NULL && endDuty < end)
+        {
             char dutyStr[10] = {0};
             strncpy(dutyStr, startDuty + 1, endDuty - startDuty - 1);
-            userinfo.iDuty = (uint32_t)atoi(dutyStr);
+            tempInfo.iDuty = (uint32_t)atoi(dutyStr);
         }
 
         // Parse Frequency value between 'f' and 'f'
         char *startFreq = strchr(start, 'f');
         char *endFreq = strchr(startFreq + 1, 'f');
-        if (startFreq != NULL && endFreq != NULL && endFreq < end) {
+        if (startFreq != NULL && endFreq != NULL && endFreq < end)
+        {
             char freqStr[10] = {0};
             strncpy(freqStr, startFreq + 1, endFreq - startFreq - 1);
-            userinfo.iFrequency = (uint32_t)atoi(freqStr);
+            tempInfo.iFrequency = (uint32_t)atoi(freqStr);
         }
     }
-    return userinfo;
+    return tempInfo;
 }
 
 /* USER CODE END 0 */
@@ -161,7 +170,7 @@ int main(void)
       /* USER CODE END WHILE */
 
       /* USER CODE BEGIN 3 */
-	  UserInfo tempInfo = parseMessage(messageBuffer);
+	  gUserInfo = parseMessage(messageBuffer);
 
       switch (gGPIOState)
       {
